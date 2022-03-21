@@ -71,7 +71,7 @@ def eventdistance(la, lo, de, e):
     laloref=[la,lo]
     o = e.preferred_origin() 
     lalo = [o.latitude, o.longitude]
-    d = 11000*locations2degrees(*lalo,*laloref)
+    d = 11000*locations2degrees(lalo[0],lalo[1],laloref[0],laloref[1])
     return  ((d**2 + (de-o.depth)**2)**.5)/1000
                  
 
@@ -81,7 +81,7 @@ def findevent(lalode,t,events):
     closest=999
     for e in events:
         tdiff = t-e.preferred_origin().time
-        distance = eventdistance(*lalode, e)
+        distance = eventdistance(lalode[0],lalode[1],lalode[2], e)
         if ((distance<nearest and abs(tdiff)<abs(closest)) or
             (distance<nearest*2 and abs(tdiff)<abs(closest)) or
             (distance<nearest and abs(tdiff)<abs(closest)*2)):
@@ -90,25 +90,25 @@ def findevent(lalode,t,events):
             refevent = e
     return refevent, closest, nearest
                 
-def isincountries(la,lo,countrycodes):
+def isincountries(la,lo,countrycodes,dthresh=1.4):
     if countrycodes is None:
         return True
     inside=False
     lalo=[la,lo]
-    gcode=geopip.search(lng=lo, lat=la)
-    #gcode = geocoder.osm(lalo,method='reverse')#.json
-    #gcode = Geocoder.reverse_geocode(*lalo)
+    for lad in [la+dthresh,la-dthresh,la]:
+        for lod in [lo+dthresh,lo-dthresh,lo]:
+            gcode=geopip.search(lng=lod, lat=lad)
+            if gcode is None or gcode['ISO2'] is None:
+                continue
+            if gcode['ISO2'].lower() in countrycodes:
+                return True
     if gcode is None or gcode['ISO2'] is None:#gcode.country_code is None:
         return False
-    if gcode['ISO2'].lower() in countrycodes:
-    #print(gcode.country__short_name.lower())
-    #if gcode.country__short_name.lower() in countrycodes:
-        return True
 
 def printsummary(true_positives,false_positives):
-    total=len(true_positives)+len(false_positives)
-    return ' & '.join(['%.1f %s true+'%(len(true_positives)/total*100, '%'),
-                       '%.1f %s false+ | '%(len(false_positives)/total*100, '%')])
+    total=len(true_positives)+len(false_positives)*1.0
+    return ' & '.join(['%.1f %sT+'%(len(true_positives)*100./total, '%'),
+                       '%.1f %sF+ | '%(len(false_positives)*100./total, '%')])
  
 def main(options):
     reference = client.Client(options.reference)
@@ -125,14 +125,18 @@ def main(options):
                 break
         if not toprocess:
             continue
-        #print(f)
 
         with open(f) as file:
             reports = [[elt.replace(' ','')[:19] for elt in line.split('|')] for line in file.read().splitlines()]
         #                                                           |#St.   |
         #Tdiff |Type|Mag.|Lat. |Lon. |Depth |origin time (UTC) |Lik.|Or.|Ma.|Str.|Len. |Author |Creation t. |Tdiff(current o.)
         #-----------------------------------------------
-        reports=[report for report in reports if len(report)>9 and report[1] in options.magtypes]
+
+        if len(reports)>0 and len(reports[0])>0 and len(reports[0][0])==4 and reports[0][0]=='Mag.':
+            reports=[ [report[3],'MVS',report[0],report[1],report[2],report[4],report[6],report[7],report[8],report[9],0,0,'scvsmag@localhost',report[5],report[3]] for report in reports if len(report)>=9 and report[0]!='Mag.' and 'MVS' in options.magtypes]
+        #Mag.|Lat.  |Lon.   |tdiff |Depth |creation time (UTC)      |origin time (UTC)        |likeh.|#st.(org.) |#st.(mag.)
+
+        reports=[report for report in reports if len(report)>9 and report[1] in options.magtypes and float(report[0])<=options.maxtimedelay]
 
         if len(reports)<1:
             continue
@@ -152,14 +156,14 @@ def main(options):
            
         if options.latitude is None:
             laloref = lalo
-        if locations2degrees(*lalo,*laloref)>options.maxradius:
+        if locations2degrees(lalo[0],lalo[1],laloref[0],laloref[1])>options.maxradius:
             continue
-        if not isincountries(*lalo,options.countrycodes):
+        if not isincountries(lalo[0],lalo[1],options.countrycodes):
             continue
                       
         to=numpy.sort([UTCDateTime(report[6]) for report in reports])[int(len(reports)/2)]
-        evoptions={'starttime': to - options.distance*110/4.4, #UTCDateTime('2970-12-31T23:59:59'),
-                   'endtime':   to + options.distance*110/4.4, #UTCDateTime('1970-01-01T01:01:01'),
+        evoptions={'starttime': to - options.time, #UTCDateTime('2970-12-31T23:59:59'),
+                   'endtime':   to + options.time, #UTCDateTime('1970-01-01T01:01:01'),
                    'longitude': longitude,
                    'latitude':  latitude,
                    'maxradius': options.distance, 
@@ -210,7 +214,7 @@ def main(options):
             #print(' | '.join([str(report[6]), report[3]+', '+report[4], report[2]+' '+report[1], 'search...']))
             
             if refevent is not None:
-                eloc = eventdistance(*lalode, refevent)
+                eloc = eventdistance(lalode[0],lalode[1],lalode[2], refevent)
                 reforigin = refevent.preferred_origin()
                 refmagnitude = refevent.preferred_magnitude()
                 mmag = refmagnitude.mag + refmagnitude.mag_errors.uncertainty
@@ -220,25 +224,23 @@ def main(options):
                     or emag<=options.maxmagnituderror):
 
                     true_positives += [(report[1], float(report[2]), float(report[7]),f)]
-                    print(printsummary(true_positives,false_positives),
-                          'True+:',
+                    print('%s T+: %s %s %s %s dM %s dloc(km) %s'%(printsummary(true_positives,false_positives),
                           report[1],
                           report[2],
                           report[7],
-                          emag,'dM',
-                          eloc,'dLoc (km)',
-                          f)
+                          '%.1f'%emag,
+                          '%d'%eloc,
+                          f))
                     continue
 
             false_positives += [(report[1], float(report[2]), float(report[7]),f)]
-            print(printsummary(true_positives,false_positives),
-                  'False+:',
+            print('%s F+: %s %s %s %s dM %s dloc(km) %s'%(printsummary(true_positives,false_positives),
                   report[1],
                   report[2],
                   report[7],
-                  emag,'dM',
-                  eloc,'dLoc (km)',
-                  f)
+                  '%.1f'%emag,
+                  '%d'%eloc,
+                  f))
             
 
 if __name__ == "__main__":
@@ -264,7 +266,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--time',
                         type=int,
                         help='Maximum allowed time difference (second)',
-                        default=20)
+                        default=50)
     parser.add_argument('-R', '--reference',
                         help='Reference FDSNWS server',
                         default='USGS')
@@ -291,6 +293,10 @@ if __name__ == "__main__":
                         type=float,
                         help='Minimum EEW likelihood (0 to 1, default -1 allows everything)',
                         default=-1.0)                          
+    parser.add_argument('-D', '--maxtimedelay',
+                        type=float,
+                        help='Maximum allowed time delay (default 60)',
+                        default=60.0)   
     parser.add_argument('-T', '--magtypes',
                         help='Magnitude types (default "MVS,Mfd")',
                         default='MVS,Mfd')   

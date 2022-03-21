@@ -22,7 +22,14 @@ For Switzerland:
 ./main.py -b 2021 -R http://arclink.ethz.ch:8080 -c "ch,li"  -T Mfd  -m 2.5  -E 3 -M 2 -q 0.5
 ```
 
+For Nicaragua:
+```
+python2 ./main.py -b 2016 -c "ni"  -T MVS  -m 5  -E 9 -M 9 -q 0.8  > MVS5
+python2 ./main.py -b 2016 -c "ni"  -T MVS  -m 6  -E 9 -M 9 -q 0.8  > MVS6
+python2 ./main.py -b 2016 -c "ni"  -T MVS,Mfd  -m 5  -E 9 -M 9 -q 0.8  > M5
+python2 ./main.py -b 2016 -c "ni"  -T MVS,Mfd  -m 6  -E 9 -M 9 -q 0.8  > M6
+```
+
 ## Limits
 - For quick parsing, it is based on sceewlog disk reports not on SeisComP database
-- Missing plot
 ...
