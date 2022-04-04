@@ -224,7 +224,8 @@ def main(options):
                     or emag<=options.maxmagnituderror):
 
                     true_positives += [(report[1], float(report[2]), float(report[7]),f)]
-                    print('%s T+: %s %s %s %s dM %s dloc(km) %s'%(printsummary(true_positives,false_positives),
+                    print('%s T+: Ot+ %s %s N %s E %s kmbsl %s %s L: %s dM: %s dloc: %s d km | %s'%(printsummary(true_positives,false_positives),
+                          report[0],report[3],report[4],report[5],
                           report[1],
                           report[2],
                           report[7],
@@ -234,7 +235,8 @@ def main(options):
                     continue
 
             false_positives += [(report[1], float(report[2]), float(report[7]),f)]
-            print('%s F+: %s %s %s %s dM %s dloc(km) %s'%(printsummary(true_positives,false_positives),
+            print('%s F+: Ot+ %s %s N %s E %s kmbsl %s %s L: %s dM: %s dloc: %s km | %s'%(printsummary(true_positives,false_positives),
+                  report[0],report[3],report[4],report[5],
                   report[1],
                   report[2],
                   report[7],

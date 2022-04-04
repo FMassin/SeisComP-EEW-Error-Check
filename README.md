@@ -17,17 +17,24 @@ See:
 
 ## Example
 
-For Switzerland:
+For a preview:
 ```
 ./main.py -b 2021 -R http://arclink.ethz.ch:8080 -c "ch,li"  -T Mfd  -m 2.5  -E 3 -M 2 -q 0.5
 ```
 
-For Nicaragua:
+For a complete analysis:
 ```
-python2 ./main.py -b 2016 -c "ni"  -T MVS  -m 5  -E 9 -M 9 -q 0.8  > MVS5
-python2 ./main.py -b 2016 -c "ni"  -T MVS  -m 6  -E 9 -M 9 -q 0.8  > MVS6
-python2 ./main.py -b 2016 -c "ni"  -T MVS,Mfd  -m 5  -E 9 -M 9 -q 0.8  > M5
-python2 ./main.py -b 2016 -c "ni"  -T MVS,Mfd  -m 6  -E 9 -M 9 -q 0.8  > M6
+for L in  $(seq 0 .1 1);
+do 
+	rm -r q${L}/*
+	mkdir -p q${L} 
+	for M in  $(seq 4 .1 6.5); 
+	do 
+		python2 ./main.py -b 2016 -c "ni"  -T MVS,Mfd  -m ${M}  -E 9 -M 9 -q $L  > q${L}/EEW-VS,fd-${M} ; 
+		python2 ./main.py -b 2016 -c "ni"  -T MVS      -m ${M}  -E 9 -M 9 -q $L  > q${L}/EEW-VS-${M} ; 
+		#cd q${L} && DISPLAY=:1 python2 ../plot.py && cd .. ;
+	done;
+done
 ```
 
 ## Limits
